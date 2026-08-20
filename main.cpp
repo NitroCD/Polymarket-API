@@ -3,6 +3,8 @@
 #include <iostream>
 #include <iomanip>
 #include <string>
+#include "event.h"
+#include "market.h"
 
 using json = nlohmann::json;
 
@@ -37,28 +39,14 @@ int main () {
     curl_easy_cleanup(curl);
 
     json data = json::parse(response);
+
+    std::vector<Event*> events;
     for (auto& event : data) {
-        std::cout << event["title"] << "\n";
-        for (auto& market : event["markets"]) {
-            bool nullBid = market["bestBid"].is_null();
-            bool nullAsk = market["bestAsk"].is_null();
-            if (nullBid || nullAsk) { continue; }
-            double bid, ask, chance;
-            if (!nullBid) { bid = market["bestBid"].get<double>(); }
-            if (!nullAsk) { ask = market["bestAsk"].get<double>(); }
-            if (nullAsk) {
-                chance = 1;
-            } else if (nullBid) {
-                chance = 0;
-            } else {
-                chance = (ask + bid) / 2;
-            }
-            chance *= 100;
-            std::cout << "  -" << market["question"] << "\n";
-            std::cout << "      -Bid: " << market["bestBid"] << "\n";
-            std::cout << "      -Ask: " << market["bestAsk"] << "\n";
-            std::cout << "      -Chance: " << chance << "%\n";
-        }
+        events.push_back(new Event(event));
+    }
+
+    for (const Event* e : events) {
+        std::cout << *e << "\n";
     }
 
     return 0;

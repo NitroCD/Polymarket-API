@@ -6,9 +6,9 @@
 using json = nlohmann::json;
 
 Market::Market() {
-    question = "";
-    ask = 0;
-    bid = 1;
+    Market::setQuestion("");
+    Market::setBid(0);
+    Market::setAsk(0);
 }
 
 Market::Market(std::string q, double b, double a) {
@@ -37,7 +37,8 @@ void Market::setBid(double b) { bid = b; }
 void Market::setAsk(double a) { ask = a; }
 
 std::ostream& operator<<(std::ostream& os, const Market& m) {
-    const double chance = (m.ask + m.bid) / 2 * 100;
+    double chance = (m.ask + m.bid) / 2 * 100;
+    if (m.bid == 0 && m.ask <= 0.01) { chance = 0; }
     os << "  -" << m.question << "\n";
     os << "     -Bid:    $" << m.bid << "\n";
     os << "     -Ask:    $" << m.ask << "\n";

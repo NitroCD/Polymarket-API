@@ -24,7 +24,33 @@ int main () {
     }
 
     std::string response;
-    std::string url = "https://gamma-api.polymarket.com/events?limit=5&active=true&closed=false";
+    //std::string url = "https://gamma-api.polymarket.com/events?limit=5&active=true&closed=false";
+    std::string url = "https://gamma-api.polymarket.com/events?slug=2026-f1-drivers-champion";
+
+    try {
+        response = getResponse(curl, url);
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << "\n";
+        return 1;
+    }
+
+    json data = json::parse(response);
+
+    std::vector<std::unique_ptr<Event>> events;
+    for (auto& event : data) {
+        events.push_back(std::make_unique<Event>(event));
+    }
+
+    for (const std::unique_ptr<Event>& e : events) {
+        std::cout << *e << "\n";
+    }
+
+    curl_easy_cleanup(curl);
+    return 0;
+}
+
+std::string getResponse(CURL* curl, const std::string& url) {
+    std::string response;
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
@@ -32,22 +58,9 @@ int main () {
 
     CURLcode res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        std::cerr << "curl error: " << curl_easy_strerror(res) << "\n";
-        curl_easy_cleanup(curl);
-        return 1;
+        throw std::runtime_error(curl_easy_strerror(res));
     }
     curl_easy_cleanup(curl);
 
-    json data = json::parse(response);
-
-    std::vector<Event*> events;
-    for (auto& event : data) {
-        events.push_back(new Event(event));
-    }
-
-    for (const Event* e : events) {
-        std::cout << *e << "\n";
-    }
-
-    return 0;
+    return response;
 }

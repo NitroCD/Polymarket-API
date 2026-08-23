@@ -26,13 +26,6 @@ int main() {
     }
 
     std::cout << "Connected!\n";
-
-    /*
-    // Send the subscription message
-    std::string rawIds = "[\"36135303630970774358991758965953725374791089628290212294816140371870983436829\", \"100818499003359884559774352671825765184103958625070066814408985574716007147193\"]";
-    json ids = json::parse(rawIds);        // parse the string into a real JSON array
-    std::string tokenId = ids[0].get<std::string>();  // pull out just ONE token id
-    */
     
     std::string tokenId = "32950178421556833525068948927823594772134813180063196823389171317494746105102";
 

@@ -8,14 +8,12 @@
 
 class Event {
     private:
-        std::string title;
-        std::vector<Market*> markets;
+        std::string title_;
+        std::vector<Market*> markets_;
 
     public:
         Event();
         Event(nlohmann::json);
-        Event(std::string);
-        Event(std::string, std::vector<Market*>);
 
         ~Event();
 

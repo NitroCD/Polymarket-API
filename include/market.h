@@ -33,6 +33,7 @@ class Market {
         void setAsk(double);
         void setBids(nlohmann::json);
         void setAsks(nlohmann::json);
+        void updateOrders(nlohmann::json);
 
         friend std::ostream& operator<<(std::ostream&, const Market&);
 };

@@ -32,7 +32,15 @@ std::string getResponse(CURL* curl, const std::string& url) {
     return response;
 }
 
-void getLivePrice(std::string tokenId) {
+void initOrders(Market* m, json j) {
+    json bids = j["bids"];
+    json asks = j["asks"];
+    m->setBids(bids);
+    m->setAsks(asks);
+}
+
+void getLivePrice(Market* m) {
+    std::string tokenId = m->getTokenId();
     CURL* wsHandle = curl_easy_init();
     curl_easy_setopt(wsHandle, CURLOPT_URL, "wss://ws-subscriptions-clob.polymarket.com/ws/market");
     curl_easy_setopt(wsHandle, CURLOPT_CONNECT_ONLY, 2L);
@@ -58,12 +66,21 @@ void getLivePrice(std::string tokenId) {
 
         if (readRes == CURLE_OK) {
             std::string response(buffer, recvLen);
-            if (!hasInit) {
-                json j = json::parse(response);
-                initMarketDepth(j);
-                hasInit = true;
+            json j = json::parse(response);
+            std::cout << "Received: ";
+            if (j.is_array()) { j = j[0]; }
+            if (j.contains("price_changes")) {
+                for (auto& change : j["price_changes"]) {
+                    if (change["asset_id"].get<std::string>() != m->getTokenId()) { continue; }
+                    m->updateOrders(change);
+                }
+                continue;  // or restructure the branch
             }
-            std::cout << "Received: " << response << "\n";
+            if (!hasInit) {
+                initOrders(m, j);
+                hasInit = true;
+                std::cout << "initial prices" << "\n";
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         } else if (readRes == CURLE_AGAIN) {
             continue; // no data yet, just poll again
@@ -75,13 +92,8 @@ void getLivePrice(std::string tokenId) {
     curl_easy_cleanup(wsHandle);
 }
 
-void initMarketDepth(json j) {
-    json bids = j["bids"];
-    json asks = j["asks"];
-}
-
 int main () {
-    std::cout << std::fixed << std::setprecision(2);
+    std::cout << std::fixed << std::setprecision(3);
 
     CURL* curl = curl_easy_init();
     if (!curl) {
@@ -113,11 +125,10 @@ int main () {
         std::cout << *e << "\n";
     }
 
-    const std::vector<Market*> markets = events[0]->getMarkets();
-    std::string tokenId = markets[3]->getTokenId();
+    std::vector<Market*> markets = events[0]->getMarkets();
 
     try {
-        getLivePrice(tokenId);
+        getLivePrice(markets[3]);
     } catch (const std::exception& e) {
         std::cerr << e.what() << "\n";
         return 1;

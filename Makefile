@@ -3,15 +3,30 @@ CXXFLAGS = -Wall -Iinclude
 LDFLAGS = -lcurl
 
 SRC_DIR = src
-SOURCES = main.cpp $(SRC_DIR)/event.cpp $(SRC_DIR)/market.cpp
-OBJECTS = $(SOURCES:.cpp=.o)
-TARGET = main
+BUILD_DIR = build
+BIN_DIR = bin
 
-$(TARGET): $(OBJECTS)
+# Automatically find every .cpp in src/, plus main.cpp at the root
+SOURCES = main.cpp $(wildcard $(SRC_DIR)/*.cpp)
+OBJECTS = $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(notdir $(SOURCES)))
+TARGET = $(BIN_DIR)/main
+
+$(TARGET): $(OBJECTS) | $(BIN_DIR)
 	$(CXX) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
 
-%.o: %.cpp
+$(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
+
 clean:
-	rm -f $(OBJECTS) $(TARGET).exe
+	rm -rf $(BUILD_DIR) $(BIN_DIR)
+
+.PHONY: clean

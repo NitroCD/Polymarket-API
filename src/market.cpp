@@ -1,6 +1,7 @@
 #include <nlohmann/json.hpp>
 #include <string>
 #include <iostream>
+#include <map>
 #include "market.h"
 
 using json = nlohmann::json;
@@ -34,11 +35,27 @@ std::string Market::getQuestion() { return question_; }
 std::string Market::getTokenId() { return tokenId_; }
 double Market::getBid() { return bid_; }
 double Market::getAsk() { return ask_; }
+std::map<double, double> Market::getBids() { return bids_; }
+std::map<double, double> Market::getBids() { return bids_; }
 
 void Market::setQuestion(std::string q) { question_ = q; }
 void Market::setTokenId(std::string id) { tokenId_ = id; }
 void Market::setBid(double b) { bid_ = b; }
 void Market::setAsk(double a) { ask_ = a; }
+void Market::setBids(json j) {
+    for (auto& bid : j) {
+        double price = j["price"].get<double>();
+        double size = j["size"].get<double>();
+        bids_[price] = size;
+    }
+}
+void Market::setAsks(json j) {
+    for (auto& ask : j) {
+        double price = j["price"].get<double>();
+        double size = j["size"].get<double>();
+        asks_[price] = size;
+    }
+}
 
 std::ostream& operator<<(std::ostream& os, const Market& m) {
     double chance = (m.ask_ + m.bid_) / 2 * 100;

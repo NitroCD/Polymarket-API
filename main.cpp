@@ -32,6 +32,54 @@ std::string getResponse(CURL* curl, const std::string& url) {
     return response;
 }
 
+void getLivePrice(std::string tokenId) {
+    CURL* wsHandle = curl_easy_init();
+    curl_easy_setopt(wsHandle, CURLOPT_URL, "wss://ws-subscriptions-clob.polymarket.com/ws/market");
+    curl_easy_setopt(wsHandle, CURLOPT_CONNECT_ONLY, 2L);
+
+    CURLcode res = curl_easy_perform(wsHandle);
+    if (res != CURLE_OK) {
+        throw std::runtime_error(curl_easy_strerror(res));
+    }
+
+    std::string subscribeMsg = "{\"assets_ids\": [\"" + tokenId + "\"], \"type\": \"market\"}";
+
+    size_t sent;
+    curl_ws_send(wsHandle, subscribeMsg.c_str(), subscribeMsg.size(), &sent, 0, CURLWS_TEXT);
+
+    bool hasInit = false;
+
+    // Read messages in a loop
+    char buffer[65536];
+    while (true) {
+        size_t recvLen;
+        const struct curl_ws_frame* meta;
+        CURLcode readRes = curl_ws_recv(wsHandle, buffer, sizeof(buffer), &recvLen, &meta);
+
+        if (readRes == CURLE_OK) {
+            std::string response(buffer, recvLen);
+            if (!hasInit) {
+                json j = json::parse(response);
+                initMarketDepth(j);
+                hasInit = true;
+            }
+            std::cout << "Received: " << response << "\n";
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        } else if (readRes == CURLE_AGAIN) {
+            continue; // no data yet, just poll again
+        } else {
+            std::cerr << "Read error: " << curl_easy_strerror(readRes) << "\n";
+            break;
+        }
+    }
+    curl_easy_cleanup(wsHandle);
+}
+
+void initMarketDepth(json j) {
+    json bids = j["bids"];
+    json asks = j["asks"];
+}
+
 int main () {
     std::cout << std::fixed << std::setprecision(2);
 
@@ -52,6 +100,8 @@ int main () {
         return 1;
     }
 
+    curl_easy_cleanup(curl);
+
     json data = json::parse(response);
 
     std::vector<std::unique_ptr<Event>> events;
@@ -63,45 +113,15 @@ int main () {
         std::cout << *e << "\n";
     }
 
-    curl_easy_cleanup(curl);
-
-    CURL* wsHandle = curl_easy_init();
-    curl_easy_setopt(wsHandle, CURLOPT_URL, "wss://ws-subscriptions-clob.polymarket.com/ws/market");
-    curl_easy_setopt(wsHandle, CURLOPT_CONNECT_ONLY, 2L);
-
-    CURLcode res = curl_easy_perform(wsHandle);
-    if (res != CURLE_OK) {
-        std::cerr << "Connect failed: " << curl_easy_strerror(res) << "\n";
-        return 1;
-    }
-
     const std::vector<Market*> markets = events[0]->getMarkets();
     std::string tokenId = markets[3]->getTokenId();
 
-    std::cout << tokenId << std::endl;
-
-    std::string subscribeMsg = "{\"assets_ids\": [\"" + tokenId + "\"], \"type\": \"market\"}";
-
-    size_t sent;
-    curl_ws_send(wsHandle, subscribeMsg.c_str(), subscribeMsg.size(), &sent, 0, CURLWS_TEXT);
-
-    // Read messages in a loop
-    char buffer[65536];
-    while (true) {
-        size_t recvLen;
-        const struct curl_ws_frame* meta;
-        CURLcode readRes = curl_ws_recv(wsHandle, buffer, sizeof(buffer), &recvLen, &meta);
-
-        if (readRes == CURLE_OK) {
-            std::cout << "Received: " << std::string(buffer, recvLen) << "\n";
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        } else if (readRes == CURLE_AGAIN) {
-            continue; // no data yet, just poll again
-        } else {
-            std::cerr << "Read error: " << curl_easy_strerror(readRes) << "\n";
-            break;
-        }
+    try {
+        getLivePrice(tokenId);
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << "\n";
+        return 1;
     }
-    curl_easy_cleanup(wsHandle);
+    
     return 0;
 }

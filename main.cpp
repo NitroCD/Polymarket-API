@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include <ctime>
 #include "event.h"
 #include "market.h"
 
@@ -32,6 +33,33 @@ std::string getResponse(CURL* curl, const std::string& url) {
     return response;
 }
 
+CURL* connectAndSubscribe(const std::string& tokenId) {
+    CURL* wsHandle = curl_easy_init();
+    curl_easy_setopt(wsHandle, CURLOPT_URL, "wss://ws-subscriptions-clob.polymarket.com/ws/market");
+    curl_easy_setopt(wsHandle, CURLOPT_CONNECT_ONLY, 2L);
+
+    CURLcode res = curl_easy_perform(wsHandle);
+    if (res != CURLE_OK) {
+        throw std::runtime_error(curl_easy_strerror(res));
+    }
+
+    std::string subscribeMsg = "{\"assets_ids\": [\"" + tokenId + "\"], \"type\": \"market\"}";
+
+    size_t sent;
+    curl_ws_send(wsHandle, subscribeMsg.c_str(), subscribeMsg.size(), &sent, 0, CURLWS_TEXT);
+
+    return wsHandle;
+}
+
+CURL* reconnectWithDeadline(const std::string& tokenId, time_t windowEnd) {
+    CURL* curl = connectAndSubscribe(tokenId);
+    while (!curl && time(nullptr) < windowEnd) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        curl = connectAndSubscribe(tokenId);
+    }
+    return curl;  // either a valid handle, or nullptr if we ran out of time
+}
+
 void initOrders(Market* m, json j) {
     json bids = j["bids"];
     json asks = j["asks"];
@@ -54,14 +82,14 @@ void createOrderBook(Market& m) {
     std::ostringstream frame;
     frame << "\033[2J\033[1;1H";
 
-    frame << "BIDS" << std::setw(20) << "RECENT ORDERS" << std::setw(20) << "ASKS" << "\n";
+    frame << "BIDS" << std::setw(40) << "ASKS" << "\n";
 
     const std::map<double, double, std::greater<double>>& bids = m.getBids();
     const std::map<double, double>& asks = m.getAsks();
     auto bidit = bids.begin();
     auto askit = asks.begin();
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 30; i++) {
         frame << formatRow(bidit, bids.end());
         frame << std::setw(20) << " ";  // middle column placeholder for now
         frame << formatRow(askit, asks.end());
@@ -75,79 +103,90 @@ void createOrderBook(Market& m) {
 
 void getLivePrice(Market* m) {
     std::string tokenId = m->getTokenId();
-    CURL* wsHandle = curl_easy_init();
-    curl_easy_setopt(wsHandle, CURLOPT_URL, "wss://ws-subscriptions-clob.polymarket.com/ws/market");
-    curl_easy_setopt(wsHandle, CURLOPT_CONNECT_ONLY, 2L);
-
-    CURLcode res = curl_easy_perform(wsHandle);
-    if (res != CURLE_OK) {
-        throw std::runtime_error(curl_easy_strerror(res));
-    }
-
-    std::string subscribeMsg = "{\"assets_ids\": [\"" + tokenId + "\"], \"type\": \"market\"}";
-
-    size_t sent;
-    curl_ws_send(wsHandle, subscribeMsg.c_str(), subscribeMsg.size(), &sent, 0, CURLWS_TEXT);
+    CURL* curl = connectAndSubscribe(tokenId);
+    std::cout << "Initial connect result: " << (curl ? "success" : "FAILED") << "\n";
 
     bool hasInit = false;
+    std::string fullMessage;
+
+    time_t now = time(nullptr);
+    time_t windowStart = now - (now % 300);
+    time_t windowEnd = windowStart + 300;
 
     // Read messages in a loop
     char buffer[65536];
     while (true) {
-        size_t recvLen;
-        const struct curl_ws_frame* meta;
-        CURLcode readRes = curl_ws_recv(wsHandle, buffer, sizeof(buffer), &recvLen, &meta);
-
-        if (readRes == CURLE_OK) {
-            std::string response(buffer, recvLen);
-            json j = json::parse(response);
-            // std::cout << "Received: ";
-            if (j.is_array()) { j = j[0]; }
-            if (j.contains("price_changes")) {
-                for (auto& change : j["price_changes"]) {
-                    if (change["asset_id"].get<std::string>() != m->getTokenId()) { continue; }
-                    m->updateOrders(change);
-                    createOrderBook(*m);
-                }
-                continue;  // or restructure the branch
-            }
-            if (!hasInit) {
-                initOrders(m, j);
-                hasInit = true;
-                createOrderBook(*m);
-                // std::cout << "initial prices" << "\n";
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        } else if (readRes == CURLE_AGAIN) {
-            continue; // no data yet, just poll again
-        } else {
-            std::cerr << "Read error: " << curl_easy_strerror(readRes) << "\n";
+        if (time(nullptr) >= windowEnd) {
+            std::cout << "Exiting: window ended\n";
             break;
         }
+
+        size_t recvLen;
+        const struct curl_ws_frame* meta;
+        CURLcode readRes = curl_ws_recv(curl, buffer, sizeof(buffer), &recvLen, &meta);
+
+        if (readRes == CURLE_OK) {
+            if (meta->flags & CURLWS_CLOSE) {
+                std::cerr << "Server sent CLOSE frame, reconnecting...\n";
+                curl_easy_cleanup(curl);
+                curl = connectAndSubscribe(tokenId);
+                while (!curl) {
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    curl = connectAndSubscribe(tokenId);
+                }
+                fullMessage.clear();
+                hasInit = false;
+                continue;
+            }
+            fullMessage.append(buffer, recvLen);
+
+            if (meta->bytesleft == 0) {
+                json j = json::parse(fullMessage);
+                fullMessage.clear();
+                if (j.is_array()) { j = j[0]; }
+                if (j.contains("price_changes")) {
+                    for (auto& change : j["price_changes"]) {
+                        if (change["asset_id"].get<std::string>() != m->getTokenId()) { continue; }
+                        m->updateOrders(change);
+                        createOrderBook(*m);
+                    }
+                    continue;  // or restructure the branch
+                }
+                if (!hasInit) {
+                    initOrders(m, j);
+                    hasInit = true;
+                    createOrderBook(*m);
+                }
+            }
+        } else if (readRes == CURLE_AGAIN) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        } else {
+            std::cout << "curl_ws_recv failed: " << curl_easy_strerror(readRes) << "\n";
+            curl_easy_cleanup(curl);
+            curl = reconnectWithDeadline(tokenId, windowEnd);
+            if (!curl) {
+                std::cout << "Exiting: reconnect failed before window ended\n";
+                break;
+            }
+
+            fullMessage.clear();
+            hasInit = false;
+            continue;
+        }
     }
-    curl_easy_cleanup(wsHandle);
+    curl_easy_cleanup(curl);
 }
 
-int main () {
-    std::cout << std::fixed << std::setprecision(3);
+std::string getCurrentURL() {
+    time_t now = time(nullptr);
+    time_t windowStart = now - (now % 300);
+    std::string slug = "btc-updown-5m-" + std::to_string(windowStart);
+    std::string url = "https://gamma-api.polymarket.com/events?slug=" + slug;
+    return url;
+}
 
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-        std::cerr << "Failed to init curl\n";
-        return 1;
-    }
-
-    std::string response;
-    // std::string url = "https://gamma-api.polymarket.com/events?limit=5&active=true&closed=false";
-    std::string url = "https://gamma-api.polymarket.com/events?slug=2026-f1-drivers-champion";
-
-    try {
-        response = getResponse(curl, url);
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << "\n";
-        return 1;
-    }
-
+std::vector<std::unique_ptr<Event>> getCurrentEvents(CURL* curl, std::string url) {
+    std::string response = getResponse(curl, url);
     curl_easy_cleanup(curl);
 
     json data = json::parse(response);
@@ -156,19 +195,47 @@ int main () {
     for (auto& event : data) {
         events.push_back(std::make_unique<Event>(event));
     }
+    return events;
+}
 
-    for (const std::unique_ptr<Event>& e : events) {
-        std::cout << *e << "\n";
+int main () {
+    std::cout << std::fixed << std::setprecision(3);
+
+    while(true) {
+        CURL* curl = curl_easy_init();
+        if (!curl) {
+            std::cerr << "Failed to init curl\n";
+            return 1;
+        }
+        std::string url = getCurrentURL();
+        std::cout << "URL: " << url << "\n";
+
+        std::vector<std::unique_ptr<Event>> events;
+
+        try {
+            events = getCurrentEvents(curl, url);
+        } catch (const std::exception& e) {
+            std::cerr << e.what() << "\n";
+            return 1;
+        }
+
+        if (events.empty()) {
+            std::cerr << "No events returned, skipping this cycle \n";
+            continue;
+        }
+        
+        std::vector<Market*> markets = events[0]->getMarkets();
+
+        try {
+            if (!markets.empty() && markets[0] != nullptr) {
+                getLivePrice(markets[0]);
+            } else {
+                std::cerr << "No markets found, skipping this cycle \n";
+            }
+        } catch (const std::exception& e) {
+            std::cerr << e.what() << "\n";
+            return 1;
+        }
     }
-
-    std::vector<Market*> markets = events[0]->getMarkets();
-
-    try {
-        getLivePrice(markets[3]);
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << "\n";
-        return 1;
-    }
-    
     return 0;
 }

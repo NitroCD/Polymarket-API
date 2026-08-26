@@ -11,7 +11,7 @@ class Market {
         std::string tokenId_;
         double bid_;
         double ask_;
-        std::map<double, double> bids_;
+        std::map<double, double, std::greater<double>> bids_;
         std::map<double, double> asks_;
 
     public:
@@ -24,7 +24,7 @@ class Market {
         std::string getTokenId();
         double getBid();
         double getAsk();
-        std::map<double, double> getBids();
+        std::map<double, double, std::greater<double>> getBids();
         std::map<double, double> getAsks();
 
         void setQuestion(std::string);

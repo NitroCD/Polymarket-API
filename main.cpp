@@ -39,6 +39,40 @@ void initOrders(Market* m, json j) {
     m->setAsks(asks);
 }
 
+std::string formatRow(std::map<double, double>::const_iterator it, 
+                       std::map<double, double>::const_iterator end) {
+    std::ostringstream row;
+    if (it != end) {
+        row << "$" << std::setw(6) << it->first << ": " << std::setw(10) << it->second;
+    } else {
+        row << std::string(20, ' ');
+    }
+    return row.str();
+}
+
+void createOrderBook(Market& m) {
+    std::ostringstream frame;
+    frame << "\033[2J\033[1;1H";
+
+    frame << "BIDS" << std::setw(20) << "RECENT ORDERS" << std::setw(20) << "ASKS" << "\n";
+
+    const std::map<double, double, std::greater<double>>& bids = m.getBids();
+    const std::map<double, double>& asks = m.getAsks();
+    auto bidit = bids.begin();
+    auto askit = asks.begin();
+
+    for (int i = 0; i < 10; i++) {
+        frame << formatRow(bidit, bids.end());
+        frame << std::setw(20) << " ";  // middle column placeholder for now
+        frame << formatRow(askit, asks.end());
+        frame << "\n";
+
+        if (bidit != bids.end()) ++bidit;
+        if (askit != asks.end()) ++askit;
+    }
+    std::cout << frame.str();
+}
+
 void getLivePrice(Market* m) {
     std::string tokenId = m->getTokenId();
     CURL* wsHandle = curl_easy_init();
@@ -67,19 +101,21 @@ void getLivePrice(Market* m) {
         if (readRes == CURLE_OK) {
             std::string response(buffer, recvLen);
             json j = json::parse(response);
-            std::cout << "Received: ";
+            // std::cout << "Received: ";
             if (j.is_array()) { j = j[0]; }
             if (j.contains("price_changes")) {
                 for (auto& change : j["price_changes"]) {
                     if (change["asset_id"].get<std::string>() != m->getTokenId()) { continue; }
                     m->updateOrders(change);
+                    createOrderBook(*m);
                 }
                 continue;  // or restructure the branch
             }
             if (!hasInit) {
                 initOrders(m, j);
                 hasInit = true;
-                std::cout << "initial prices" << "\n";
+                createOrderBook(*m);
+                // std::cout << "initial prices" << "\n";
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         } else if (readRes == CURLE_AGAIN) {

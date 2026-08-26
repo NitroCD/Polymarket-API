@@ -35,7 +35,7 @@ std::string Market::getQuestion() { return question_; }
 std::string Market::getTokenId() { return tokenId_; }
 double Market::getBid() { return bid_; }
 double Market::getAsk() { return ask_; }
-std::map<double, double> Market::getBids() { return bids_; }
+std::map<double, double, std::greater<double>> Market::getBids() { return bids_; }
 std::map<double, double> Market::getAsks() { return asks_; }
 
 void Market::setQuestion(std::string q) { question_ = q; }
@@ -69,7 +69,7 @@ void Market::updateOrders(json j) {
             if (size == 0) { asks_.erase(price); }
             else { asks_[price] = size; }
         }
-    std::cout << orderType + " " << size << " at $" << price << "\n";
+    // std::cout << orderType + " " << size << " at $" << price << "\n";
 
 }
 

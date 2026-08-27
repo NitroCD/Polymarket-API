@@ -86,10 +86,13 @@ std::string formatRow(std::map<double, double>::const_iterator it,
 
 void createOrderBook(Market& m) {
     std::ostringstream frame;
-    frame << std::fixed << std::setprecision(3);
+    frame << std::fixed << std::setprecision(2);
     frame << "\033[2J\033[1;1H";
 
-    frame << "BIDS" << std::setw(39) << "ASKS" << std::setw(42) << "ORDERS\n";
+    frame << "BIDS" << std::setw(39) << "ASKS" << std::setw(41) << "ORDERS";
+    frame << std::setw(39) << "LIVE PRICE: $" << m.getLivePrice() << "\n";
+
+    frame << std::fixed << std::setprecision(3);
 
     const std::map<double, double, std::greater<double>>& bids = m.getBids();
     const std::map<double, double>& asks = m.getAsks();
@@ -169,8 +172,15 @@ void getLivePrice(Market* m) {
                         createOrderBook(*m);
                     }
                     continue;  // or restructure the branch
-                } else if (j.contains("live_price")) {
-                    
+                } else if (j.contains("event_type")) {
+                   if (j["event_type"].get<std::string>() == "last_trade_price"
+                        && j["asset_id"].get<std::string>() == m->getTokenId()) {
+                        m->setLivePrice(stod(j["price"].get<std::string>()));
+                   }
+                   if (j["event_type"].get<std::string>() == "best_bid_ask"
+                        && j["asset_id"].get<std::string>() == m->getTokenId()) {
+                        // update best bid/ask on market
+                   }
                 }
                 if (!hasInit) {
                     initOrders(m, j);

@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <map>
+#include <deque>
 
 class Market {
     private:
@@ -13,6 +14,7 @@ class Market {
         double ask_;
         std::map<double, double, std::greater<double>> bids_;
         std::map<double, double> asks_;
+        std::deque<std::string> recentTrades;
 
     public:
         Market();

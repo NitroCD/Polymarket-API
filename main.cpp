@@ -71,7 +71,7 @@ std::string formatRow(std::map<double, double>::const_iterator it,
                        std::map<double, double>::const_iterator end) {
     std::ostringstream row;
     if (it != end) {
-        row << "$" << std::setw(6) << it->first << ": " << std::setw(10) << it->second;
+        row << std::setw(7) << "$" << it->first << ": " << std::setw(10) << it->second;
     } else {
         row << std::string(20, ' ');
     }

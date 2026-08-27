@@ -43,6 +43,7 @@ void Market::setTokenId(std::string id) { tokenId_ = id; }
 void Market::setBid(double b) { bid_ = b; }
 void Market::setAsk(double a) { ask_ = a; }
 void Market::setBids(json j) {
+    bids_.clear();
     for (auto& bid : j) {
         double price = std::stod(bid["price"].get<std::string>()); 
         double size = std::stod(bid["size"].get<std::string>());
@@ -50,6 +51,7 @@ void Market::setBids(json j) {
     }
 }
 void Market::setAsks(json j) {
+    asks_.clear();
     for (auto& ask : j) {
         double size = std::stod(ask["size"].get<std::string>());
         double price = std::stod(ask["price"].get<std::string>());
@@ -69,8 +71,6 @@ void Market::updateOrders(json j) {
             if (size == 0) { asks_.erase(price); }
             else { asks_[price] = size; }
         }
-    // std::cout << orderType + " " << size << " at $" << price << "\n";
-
 }
 
 std::ostream& operator<<(std::ostream& os, const Market& m) {

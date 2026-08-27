@@ -10,8 +10,7 @@ using json = nlohmann::json;
 Market::Market() {
     Market::setQuestion("");
     Market::setTokenId("");
-    Market::setBid(0);
-    Market::setAsk(0);
+    Market::setLivePrice(0);
 }
 
 Market::Market(json j) {
@@ -25,25 +24,20 @@ Market::Market(json j) {
         Market::setTokenId(ids[0].get<std::string>());
     }
 
-    if (j["bestBid"].is_null()) { Market::setBid(0); }
-    else { Market::setBid(j["bestBid"].get<double>()); }
-
-    if (j["bestAsk"].is_null()) { Market::setAsk(0); }
-    else { Market::setAsk(j["bestAsk"].get<double>()); }
+    if (j["lastTradePrice"].is_null()) { Market::setLivePrice(0); }
+    else { Market::setLivePrice(j["lastTradePrice"].get<double>()); }
 }
 
 std::string Market::getQuestion() { return question_; }
 std::string Market::getTokenId() { return tokenId_; }
-double Market::getBid() { return bid_; }
-double Market::getAsk() { return ask_; }
+double Market::getLivePrice() { return livePrice_; }
 std::map<double, double, std::greater<double>> Market::getBids() { return bids_; }
 std::map<double, double> Market::getAsks() { return asks_; }
 std::deque<std::string> Market::getRecentTrades() { return recentTrades_; }
 
 void Market::setQuestion(std::string q) { question_ = q; }
 void Market::setTokenId(std::string id) { tokenId_ = id; }
-void Market::setBid(double b) { bid_ = b; }
-void Market::setAsk(double a) { ask_ = a; }
+void Market::setLivePrice(double p) { livePrice_ = p; }
 void Market::setBids(json j) {
     bids_.clear();
     for (auto& bid : j) {
@@ -120,12 +114,6 @@ void Market::updateTrades(const double& size, const double& price, bool isBid) {
 }
 
 std::ostream& operator<<(std::ostream& os, const Market& m) {
-    double chance = (m.ask_ + m.bid_) / 2 * 100;
-    if (m.bid_ == 0 && (m.ask_ <= 0.01 || m.ask_ == 1)) { chance = 0; }
     os << "  -" << m.question_ << "\n";
-    os << "     -Bid:    $" << m.bid_ << "\n";
-    os << "     -Ask:    $" << m.ask_ << "\n";
-    os << "     -Chance:  " << chance << "%\n";
-    
     return os;
 }

@@ -45,7 +45,7 @@ CURL* connectAndSubscribe(const std::string& tokenId) {
         throw std::runtime_error(curl_easy_strerror(res));
     }
 
-    std::string subscribeMsg = "{\"assets_ids\": [\"" + tokenId + "\"], \"type\": \"market\"}";
+    std::string subscribeMsg = "{\"assets_ids\": [\"" + tokenId + "\"], \"type\": \"market\", \"custom_feature_enabled\": true}";
 
     size_t sent;
     curl_ws_send(wsHandle, subscribeMsg.c_str(), subscribeMsg.size(), &sent, 0, CURLWS_TEXT);
@@ -169,6 +169,8 @@ void getLivePrice(Market* m) {
                         createOrderBook(*m);
                     }
                     continue;  // or restructure the branch
+                } else if (j.contains("live_price")) {
+                    
                 }
                 if (!hasInit) {
                     initOrders(m, j);

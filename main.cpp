@@ -3,6 +3,8 @@
 #include <iostream>
 #include <iomanip>
 #include <string>
+#include <map>
+#include <deque>
 #include <thread>
 #include <chrono>
 #include <ctime>
@@ -61,42 +63,58 @@ CURL* reconnectWithDeadline(const std::string& tokenId, time_t windowEnd) {
 }
 
 void initOrders(Market* m, json j) {
+    // std::cout << "before initOrders" << std::endl;
     json bids = j["bids"];
     json asks = j["asks"];
     m->setBids(bids);
     m->setAsks(asks);
+    m->clearRecentTrades();
+
+    // std::cout << "after initOrders" << std::endl;
 }
 
 std::string formatRow(std::map<double, double>::const_iterator it, 
                        std::map<double, double>::const_iterator end) {
     std::ostringstream row;
     if (it != end) {
-        row << std::setw(7) << "$" << it->first << ": " << std::setw(10) << it->second;
+        row << "$" << std::setw(6) << it->first << ": " << std::setw(10) << it->second;
     } else {
-        row << std::string(20, ' ');
+        row << std::string(19, ' ');
     }
     return row.str();
 }
 
 void createOrderBook(Market& m) {
     std::ostringstream frame;
+    frame << std::fixed << std::setprecision(3);
     frame << "\033[2J\033[1;1H";
 
-    frame << "BIDS" << std::setw(40) << "ASKS" << "\n";
+    frame << "BIDS" << std::setw(39) << "ASKS" << std::setw(42) << "ORDERS\n";
 
     const std::map<double, double, std::greater<double>>& bids = m.getBids();
     const std::map<double, double>& asks = m.getAsks();
+    std::deque<std::string> recentTrades = m.getRecentTrades();
     auto bidit = bids.begin();
     auto askit = asks.begin();
+    auto tradesit = recentTrades.begin();
 
     for (int i = 0; i < 30; i++) {
         frame << formatRow(bidit, bids.end());
-        frame << std::setw(20) << " ";  // middle column placeholder for now
+        frame << std::setw(20) << " ";
         frame << formatRow(askit, asks.end());
+        frame << std::setw(20) << " ";
+        frame << std::left;
+        if (tradesit != recentTrades.end()) {
+            frame << std::setw(35) << *tradesit;
+        } else {
+            frame << std::setw(35) << " ";
+        }
+        frame << std::right;
         frame << "\n";
 
         if (bidit != bids.end()) ++bidit;
         if (askit != asks.end()) ++askit;
+        if (tradesit != recentTrades.end()) ++tradesit;
     }
     std::cout << frame.str();
 }
@@ -199,8 +217,6 @@ std::vector<std::unique_ptr<Event>> getCurrentEvents(CURL* curl, std::string url
 }
 
 int main () {
-    std::cout << std::fixed << std::setprecision(3);
-
     while(true) {
         CURL* curl = curl_easy_init();
         if (!curl) {

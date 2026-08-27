@@ -1,4 +1,5 @@
 #include <nlohmann/json.hpp>
+#include <format>
 #include <string>
 #include <iostream>
 #include <map>
@@ -37,6 +38,7 @@ double Market::getBid() { return bid_; }
 double Market::getAsk() { return ask_; }
 std::map<double, double, std::greater<double>> Market::getBids() { return bids_; }
 std::map<double, double> Market::getAsks() { return asks_; }
+std::deque<std::string> Market::getRecentTrades() { return recentTrades_; }
 
 void Market::setQuestion(std::string q) { question_ = q; }
 void Market::setTokenId(std::string id) { tokenId_ = id; }
@@ -59,18 +61,62 @@ void Market::setAsks(json j) {
     }
 }
 
+void Market::clearRecentTrades() { recentTrades_.clear(); }
+
 void Market::updateOrders(json j) {
     double size = std::stod(j["size"].get<std::string>());
     double price = std::stod(j["price"].get<std::string>());
     std::string orderType = j["side"].get<std::string>();
 
-        if (orderType == "BUY") {
-            if (size == 0) { bids_.erase(price); }
-            else { bids_[price] = size; }
-        } else {
-            if (size == 0) { asks_.erase(price); }
-            else { asks_[price] = size; }
+    if (orderType == "BUY") {
+        double oldBidSize;
+        if (bids_.contains(price)) {
+            oldBidSize = bids_[price];
+        } else { oldBidSize = 0; }
+
+        if (size == 0) {
+            bids_.erase(price);
         }
+        else {
+            bids_[price] = size;
+        }
+        updateTrades(size - oldBidSize, price, true);
+    } else {
+        double oldAskSize;
+        if (asks_.contains(price)) {
+            oldAskSize = asks_[price];
+        } else { oldAskSize = 0; }
+
+        if (size == 0) {
+            asks_.erase(price);
+        }
+        else {
+            asks_[price] = size;
+        }
+        updateTrades(size - oldAskSize, price, false);
+    }
+}
+
+void Market::updateTrades(const double& size, const double& price, bool isBid) {
+    std::string orderType;
+    std::string orderAction;
+    std::string suffix = std::string(std::format("{:.2f}", abs(size)) + " at $" + std::format("{:.3f}", price));
+
+    if (size >= 0) {
+        orderType = "LMT ";
+    } else {
+        orderType = "MKT ";
+    }
+
+    if ((isBid && size > 0) || (!isBid && size < 0)) {
+        orderAction = "BUY ";
+    } else {
+        orderAction = "SELL ";
+    }
+
+    recentTrades_.push_back(std::string(orderType + orderAction + suffix));
+
+    if (recentTrades_.size() > 30) { recentTrades_.pop_front(); }
 }
 
 std::ostream& operator<<(std::ostream& os, const Market& m) {

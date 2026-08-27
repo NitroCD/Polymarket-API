@@ -63,14 +63,11 @@ CURL* reconnectWithDeadline(const std::string& tokenId, time_t windowEnd) {
 }
 
 void initOrders(Market* m, json j) {
-    // std::cout << "before initOrders" << std::endl;
     json bids = j["bids"];
     json asks = j["asks"];
     m->setBids(bids);
     m->setAsks(asks);
     m->clearRecentTrades();
-
-    // std::cout << "after initOrders" << std::endl;
 }
 
 std::string formatRow(std::map<double, double>::const_iterator it, 
@@ -90,7 +87,9 @@ void createOrderBook(Market& m) {
     frame << "\033[2J\033[1;1H";
 
     frame << "BIDS" << std::setw(39) << "ASKS" << std::setw(41) << "ORDERS";
-    frame << std::setw(39) << "LIVE PRICE: $" << m.getLivePrice() << "\n";
+    frame << std::setw(39) << "LIVE PRICE: $" << m.getLivePrice();
+    frame << std::setw(15) << "BEST BID: $" << m.getBestBid();
+    frame << std::setw(15) << "BEST ASK: $" << m.getBestAsk() << "\n";
 
     frame << std::fixed << std::setprecision(3);
 
@@ -179,7 +178,8 @@ void getLivePrice(Market* m) {
                    }
                    if (j["event_type"].get<std::string>() == "best_bid_ask"
                         && j["asset_id"].get<std::string>() == m->getTokenId()) {
-                        // update best bid/ask on market
+                        m->setBestBid(stod(j["best_bid"].get<std::string>()));
+                        m->setBestAsk(stod(j["best_ask"].get<std::string>()));
                    }
                 }
                 if (!hasInit) {

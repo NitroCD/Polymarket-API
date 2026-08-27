@@ -31,6 +31,8 @@ Market::Market(json j) {
 std::string Market::getQuestion() { return question_; }
 std::string Market::getTokenId() { return tokenId_; }
 double Market::getLivePrice() { return livePrice_; }
+double Market::getBestBid() { return bestBid_; }
+double Market::getBestAsk() { return bestAsk_; }
 std::map<double, double, std::greater<double>> Market::getBids() { return bids_; }
 std::map<double, double> Market::getAsks() { return asks_; }
 std::deque<std::string> Market::getRecentTrades() { return recentTrades_; }
@@ -38,6 +40,8 @@ std::deque<std::string> Market::getRecentTrades() { return recentTrades_; }
 void Market::setQuestion(std::string q) { question_ = q; }
 void Market::setTokenId(std::string id) { tokenId_ = id; }
 void Market::setLivePrice(double p) { livePrice_ = p; }
+void Market::setBestBid(double b) { bestBid_ = b; }
+void Market::setBestAsk(double a) { bestAsk_ = a; }
 void Market::setBids(json j) {
     bids_.clear();
     for (auto& bid : j) {

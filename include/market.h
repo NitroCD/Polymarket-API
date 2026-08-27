@@ -11,6 +11,8 @@ class Market {
         std::string question_;
         std::string tokenId_;
         double livePrice_;
+        double bestBid_;
+        double bestAsk_;
         std::map<double, double, std::greater<double>> bids_;
         std::map<double, double> asks_;
         std::deque<std::string> recentTrades_;
@@ -24,6 +26,8 @@ class Market {
         std::string getQuestion();
         std::string getTokenId();
         double getLivePrice();
+        double getBestBid();
+        double getBestAsk();
         std::map<double, double, std::greater<double>> getBids();
         std::map<double, double> getAsks();
         std::deque<std::string> getRecentTrades();
@@ -31,6 +35,8 @@ class Market {
         void setQuestion(std::string);
         void setTokenId(std::string);
         void setLivePrice(double);
+        void setBestBid(double);
+        void setBestAsk(double);
         void setBids(nlohmann::json);
         void setAsks(nlohmann::json);
         void clearRecentTrades();

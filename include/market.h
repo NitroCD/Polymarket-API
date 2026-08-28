@@ -40,6 +40,7 @@ class Market {
         void setBids(nlohmann::json);
         void setAsks(nlohmann::json);
         void clearRecentTrades();
+        void clearStaleOrders(double, double);
         void updateOrders(nlohmann::json);
         void updateTrades(const double&, const double&, bool);
 

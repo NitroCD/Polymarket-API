@@ -61,6 +61,23 @@ void Market::setAsks(json j) {
 
 void Market::clearRecentTrades() { recentTrades_.clear(); }
 
+void Market::clearStaleOrders(double maxBid, double minAsk) {
+    for (auto it = bids_.begin(); it != bids_.end();) {
+        if (it->first > maxBid) {
+            it = bids_.erase(it);
+        } else {
+            break;
+        }
+    }
+    for (auto it = asks_.begin(); it != asks_.end();) {
+        if (it->first < minAsk) {
+            it = asks_.erase(it);
+        } else {
+            break;
+        }
+    }
+}
+
 void Market::updateOrders(json j) {
     double size = std::stod(j["size"].get<std::string>());
     double price = std::stod(j["price"].get<std::string>());

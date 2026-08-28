@@ -178,8 +178,11 @@ void getLivePrice(Market* m) {
                    }
                    if (j["event_type"].get<std::string>() == "best_bid_ask"
                         && j["asset_id"].get<std::string>() == m->getTokenId()) {
-                        m->setBestBid(stod(j["best_bid"].get<std::string>()));
-                        m->setBestAsk(stod(j["best_ask"].get<std::string>()));
+                        double bestBid = stod(j["best_bid"].get<std::string>());
+                        double bestAsk = stod(j["best_ask"].get<std::string>());
+                        m->setBestBid(bestBid);
+                        m->setBestAsk(bestAsk);
+                        m->clearStaleOrders(bestBid, bestAsk);
                    }
                 }
                 if (!hasInit) {

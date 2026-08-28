@@ -46,4 +46,3 @@ class Market {
 
         friend std::ostream& operator<<(std::ostream&, const Market&);
 };
-

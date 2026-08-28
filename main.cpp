@@ -170,7 +170,7 @@ void getLivePrice(Market* m) {
                         m->updateOrders(change);
                         createOrderBook(*m);
                     }
-                    continue;  // or restructure the branch
+                    continue;
                 } else if (j.contains("event_type")) {
                    if (j["event_type"].get<std::string>() == "last_trade_price"
                         && j["asset_id"].get<std::string>() == m->getTokenId()) {
